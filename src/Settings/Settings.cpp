@@ -211,6 +211,8 @@ namespace Settings
 				const auto& combatCamera = root["combat_camera_settings"]["combat_camera"];
 				ApplyIfPresent(combatCamera, "ZoomToggleSelectorCloseValue", ZoomToggleSelectorCloseValue);
 				ApplyIfPresent(combatCamera, "ZoomToggleCombatFOV", ZoomToggleCombatFOV);
+				// Opt-out toggle for the mod's combat camera (see CameraController::IsVanillaCombatCameraActive)
+				ApplyIfPresent(combatCamera, "VanillaCombatCamera", VanillaCombatCamera);
 
 				const auto& castCamera = root["close_camera_settings"]["cast_camera"];
 				ApplyIfPresent(castCamera, "ZoomToggleCastMinZoom", ZoomToggleCastMinZoom);

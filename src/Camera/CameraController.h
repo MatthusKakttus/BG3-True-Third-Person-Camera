@@ -40,6 +40,7 @@ public:
 		bool combatFocusTrackingStateInitialized = false;
 		bool prevCombatFocusTrackingEnabled = false;
 		bool prevActiveCloseViewMode = false;
+		bool prevVanillaCombatActive = false; // vanilla-combat state last frame, used to detect transitions
 		bool actionModeSuspend = false;
 		bool l3HoldUsedForZoom = false;
 		bool selectorModeActive = false;
@@ -98,6 +99,12 @@ public:
 	bool ShouldApplyCloseViewFraming() const;
 	bool GetBaseCloseViewMode() const;
 	bool IsVanillaFarCameraActive(int16_t playerId) const;
+	// True while the "Vanilla Camera in Combat" setting is on and the camera is in combat / turn-based mode
+	bool IsVanillaCombatCameraActive(int16_t playerId) const;
+	// True if either the vanilla far camera or the vanilla combat camera is active (the mod must not touch the camera)
+	bool ShouldUseVanillaCamera(int16_t playerId) const;
+	// Per-frame: detects entering/leaving vanilla combat and resets/restores the mod's pitch, zoom and selector state
+	void UpdateVanillaCombatTransition();
 
 	struct CameraDefinitionBaseline
 	{

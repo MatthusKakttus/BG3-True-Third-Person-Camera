@@ -14,7 +14,8 @@ namespace Hooks
 			return pitch;
 		}
 
-		if (cameraController->IsVanillaFarCameraActive(playerId)) {
+		// Vanilla far view or vanilla combat: keep the game's own pitch
+		if (cameraController->ShouldUseVanillaCamera(playerId)) {
 			return pitch;
 		}
 
@@ -35,7 +36,8 @@ namespace Hooks
 			return;
 		}
 
-		if (cameraController->IsVanillaFarCameraActive(playerId)) {
+		// Vanilla far view or vanilla combat: run the game's pitch update unmodified
+		if (cameraController->ShouldUseVanillaCamera(playerId)) {
 			updateCameraPitch_(unused1, unused2, cameraObject, frameContext);
 			return;
 		}

@@ -104,6 +104,8 @@ namespace Hooks
 			}
 		}
 
+		// Handle entering/leaving the vanilla combat camera before settings and overrides are applied
+		cameraController->UpdateVanillaCombatTransition();
 		cameraController->SetCameraSettings();
 		cameraController->ApplyZoomToggleCameraOverrides();
 

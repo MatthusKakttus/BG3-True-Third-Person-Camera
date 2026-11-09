@@ -7,6 +7,13 @@ namespace
 {
 	constexpr bool kDeviceRoutingEnabled = true;
 
+	// Read-only access to the game's own SDL2 game controller state.
+	//
+	// NOTE: SDL_GameControllerUpdate is deliberately NOT bound or called here. It used to be
+	// called on every poll (once per frame from the camera hooks). The game already pumps SDL
+	// events itself, and the extra calls interfered with its input handling while a level
+	// transition was re-initialising input, leaving the game stuck on a black loading screen
+	// when playing with a controller. We only read the state the game has already updated.
 	struct SdlPad
 	{
 		typedef int(__cdecl* tNumJoysticks)();
@@ -14,15 +21,15 @@ namespace
 		typedef void*(__cdecl* tOpen)(int);
 		typedef uint8_t(__cdecl* tGetButton)(void*, int);
 		typedef int16_t(__cdecl* tGetAxis)(void*, int);
-		typedef void(__cdecl* tUpdate)();
+		typedef void(__cdecl* tClose)(void*);
 		typedef int(__cdecl* tGetAttached)(void*);
 
 		static inline tNumJoysticks NumJoysticks = nullptr;
 		static inline tIsGameController IsGameController = nullptr;
 		static inline tOpen Open = nullptr;
+		static inline tClose Close = nullptr;
 		static inline tGetButton GetButton = nullptr;
 		static inline tGetAxis GetAxis = nullptr;
-		static inline tUpdate Update = nullptr;
 		static inline tGetAttached GetAttached = nullptr;
 		static inline bool triedLoad = false;
 
@@ -44,7 +51,7 @@ namespace
 			Open = reinterpret_cast<tOpen>(GetProcAddress(h, "SDL_GameControllerOpen"));
 			GetButton = reinterpret_cast<tGetButton>(GetProcAddress(h, "SDL_GameControllerGetButton"));
 			GetAxis = reinterpret_cast<tGetAxis>(GetProcAddress(h, "SDL_GameControllerGetAxis"));
-			Update = reinterpret_cast<tUpdate>(GetProcAddress(h, "SDL_GameControllerUpdate"));
+			Close = reinterpret_cast<tClose>(GetProcAddress(h, "SDL_GameControllerClose"));
 			GetAttached = reinterpret_cast<tGetAttached>(GetProcAddress(h, "SDL_GameControllerGetAttached"));
 		}
 
@@ -55,6 +62,12 @@ namespace
 				return nullptr;
 			if (handles[padIndex]) {
 				if (GetAttached && !GetAttached(handles[padIndex])) {
+					// The pad was detached or re-enumerated (e.g. during a transition). Close our
+					// handle instead of just dropping the pointer, so the reference is not leaked
+					// and no stale handle is kept. A fresh one is opened below.
+					if (Close) {
+						Close(handles[padIndex]);
+					}
 					handles[padIndex] = nullptr;
 				} else {
 					return handles[padIndex];
@@ -127,9 +140,8 @@ bool CameraController::IsControllerButtonPressed(int16_t playerId, int buttonMas
 {
 	const int padIndex = ResolvePadIndex(this, playerId);
 
+	// Read-only SDL access, no SDL_GameControllerUpdate (see SdlPad).
 	if (void* c = SdlPad::GetHandle(padIndex)) {
-		if (SdlPad::Update)
-			SdlPad::Update();
 		const int btn = SdlPad::XInputMaskToButton(buttonMask);
 		if (btn >= 0 && SdlPad::GetButton) {
 			return SdlPad::GetButton(c, btn) != 0;
@@ -170,9 +182,8 @@ bool CameraController::IsLeftStickActive(int16_t playerId) const
 {
 	const int padIndex = ResolvePadIndex(this, playerId);
 
+	// Read-only SDL access, no SDL_GameControllerUpdate (see SdlPad).
 	if (void* c = SdlPad::GetHandle(padIndex)) {
-		if (SdlPad::Update)
-			SdlPad::Update();
 		if (SdlPad::GetAxis) {
 			const float x = static_cast<float>(SdlPad::GetAxis(c, 0)); // SDL_CONTROLLER_AXIS_LEFTX
 			const float y = static_cast<float>(SdlPad::GetAxis(c, 1)); // SDL_CONTROLLER_AXIS_LEFTY

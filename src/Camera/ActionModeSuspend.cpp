@@ -9,6 +9,88 @@
 namespace
 {
 	constexpr float kZoomToggleActionZoomValue = 7.0f;
+	// Gamepad L3 (left stick) free look is owned by the game: the client snapshot's SelectMode (written
+	// by the Script Extender side) mirrors it. It turns on ~0.1 s after the L3 press and turns off when
+	// the game leaves free look. B/Circle is not a reliable "leave free look" signal, because it also
+	// closes containers and the attack wheel without leaving free look, and no native signal
+	// (selector flag, preview task, input controller state) changes when those UIs open or close.
+	// The mod's own free-look flag therefore follows SelectMode instead of reacting to B.
+
+	// SelectMode must stay off this long (after having been on) before the mod concludes that the
+	// game left free look. Debounces single-frame flickers of the snapshot.
+	constexpr float kFreeLookSelectOffConfirmSeconds = 0.15f;
+	// If SelectMode never turns on after the L3 toggle, the game ignored the press (for example L3 was
+	// pressed while a UI had focus), so the mod drops its own flag after this long to stay in sync.
+	constexpr float kFreeLookEntryTimeoutSeconds = 1.0f;
+}
+
+// Tracks the gamepad L3 free-look toggle for the current player. Must run every update, before any
+// early return in IsCharacterInActionMode, so L3 edges are never missed while a selector or
+// tactical view is open.
+void CameraController::UpdateControllerSelectorToggle() const
+{
+	const int16_t playerId = CurrentPlayerId();
+	if (playerId == 0) {
+		return;
+	}
+	auto& pd = GetPlayerData(playerId);
+
+	if (!Hooks::Offsets::isInControllerMode || !*Hooks::Offsets::isInControllerMode) {
+		pd.l3SelectorActive = false;
+		pd.wasBPressed = false;
+		pd.freeLookEntryTimer = 0.f;
+		pd.freeLookSelectModeSeen = false;
+		pd.freeLookSelectOffTimer = 0.f;
+		return;
+	}
+
+	bool snapSelectMode = false, snapInputActive = true, snapEnemyTurn = false;
+	const bool haveSnapshot = FindClientSnapshotForPlayer(snapSelectMode, snapInputActive, snapEnemyTurn);
+	const float dt = deltaTime_;
+
+	const bool isL3Pressed = IsControllerButtonPressed(playerId, 0x0040);  // XINPUT_GAMEPAD_LEFT_THUMB (L3)
+	if (isL3Pressed && !pd.wasL3Pressed) {
+		pd.l3HoldUsedForZoom = false;
+	}
+	if (isL3Pressed && currentCamera_ && std::abs(currentCamera_->zoomDelta) > 0.01f) {
+		pd.l3HoldUsedForZoom = true;
+	}
+	if (!isL3Pressed && pd.wasL3Pressed && !pd.l3HoldUsedForZoom) {
+		// L3 tap (not a zoom hold) toggles free look; restart the SelectMode tracking for the new state.
+		pd.l3SelectorActive = !pd.l3SelectorActive;
+		pd.freeLookEntryTimer = 0.f;
+		pd.freeLookSelectModeSeen = false;
+		pd.freeLookSelectOffTimer = 0.f;
+	}
+	pd.wasL3Pressed = isL3Pressed;
+
+	const bool isBPressed = IsControllerButtonPressed(playerId, 0x2000);  // XINPUT_GAMEPAD_B (Cancel)
+	const bool bPressedNow = isBPressed && !pd.wasBPressed;
+	pd.wasBPressed = isBPressed;
+
+	if (pd.l3SelectorActive) {
+		if (haveSnapshot) {
+			// Follow the game: the mod's free-look flag lives as long as SelectMode does.
+			// B is deliberately not used here, because it may only be closing a container or wheel.
+			if (snapSelectMode) {
+				pd.freeLookSelectModeSeen = true;
+				pd.freeLookSelectOffTimer = 0.f;
+			} else if (pd.freeLookSelectModeSeen) {
+				pd.freeLookSelectOffTimer += dt;
+				if (pd.freeLookSelectOffTimer >= kFreeLookSelectOffConfirmSeconds) {
+					pd.l3SelectorActive = false;
+				}
+			} else {
+				pd.freeLookEntryTimer += dt;
+				if (pd.freeLookEntryTimer >= kFreeLookEntryTimeoutSeconds) {
+					pd.l3SelectorActive = false;
+				}
+			}
+		} else if (bPressedNow) {
+			// No snapshot from the Script Extender side: fall back to B leaving free look.
+			pd.l3SelectorActive = false;
+		}
+	}
 }
 
 void CameraController::SetActionModeSuspend(bool suspend)
@@ -129,6 +211,12 @@ bool CameraController::IsCharacterInActionMode(uintptr_t characterPtr, int16_t n
 {
 	if (!characterPtr)
 		return false;
+
+	// Update the gamepad L3 free-look state every update, before any early return below, so L3
+	// presses and SelectMode changes that happen while a selector/wheel/tactical view is open
+	// are never missed (the old inline L3/B block sat below those early returns).
+	UpdateControllerSelectorToggle();
+
 	__try {
 		if (currentCamera_ && (currentCamera_->cameraModeFlags & RE::CameraModeFlags::kTactical)) {
 			return true;
@@ -178,32 +266,6 @@ bool CameraController::IsCharacterInActionMode(uintptr_t characterPtr, int16_t n
 
 		const int16_t playerId = CurrentPlayerId();
 		auto& pd = GetPlayerData(playerId);
-		bool isL3Pressed = false;
-		if (Hooks::Offsets::isInControllerMode && *Hooks::Offsets::isInControllerMode) {
-			isL3Pressed = IsControllerButtonPressed(playerId, 0x0040); // XINPUT_GAMEPAD_LEFT_THUMB (L3)
-		}
-
-		if (Hooks::Offsets::isInControllerMode && *Hooks::Offsets::isInControllerMode) {
-			if (isL3Pressed && !pd.wasL3Pressed) {
-				pd.l3HoldUsedForZoom = false;
-			}
-			if (isL3Pressed && currentCamera_ && std::abs(currentCamera_->zoomDelta) > 0.01f) {
-				pd.l3HoldUsedForZoom = true;
-			}
-			if (!isL3Pressed && pd.wasL3Pressed && !pd.l3HoldUsedForZoom) {
-				pd.l3SelectorActive = !pd.l3SelectorActive;
-			}
-			pd.wasL3Pressed = isL3Pressed;
-
-			bool isBPressed = IsControllerButtonPressed(playerId, 0x2000); // XINPUT_GAMEPAD_B (Cancel)
-			if (isBPressed && !pd.wasBPressed && pd.l3SelectorActive) {
-				pd.l3SelectorActive = false;
-			}
-			pd.wasBPressed = isBPressed;
-		} else {
-			pd.l3SelectorActive = false;
-			pd.wasBPressed = false;
-		}
 
 		if (pd.l3SelectorActive) {
 			foundActive = true;

@@ -57,6 +57,13 @@ public:
 		bool l3SelectorActive = false;
 		bool wasL3Pressed = false;
 		bool wasBPressed = false;
+		// L3 free-look sync with the game's SelectMode (see UpdateControllerSelectorToggle):
+		// time since the L3 toggle while SelectMode has not turned on yet,
+		float freeLookEntryTimer = 0.f;
+		// whether SelectMode has been seen on since the toggle,
+		bool freeLookSelectModeSeen = false;
+		// and how long it has been off since then.
+		float freeLookSelectOffTimer = 0.f;
 		bool capsLockFreelook = false;
 		bool capsLockWasPhysicallyDown = false;
 
@@ -144,6 +151,8 @@ public:
 	bool ShouldReleasePositionLock() const;
 	void UpdateActionModeSuspend(RE::Player* player);
 	bool IsCharacterInActionMode(uintptr_t characterPtr, int16_t nativePlayerId) const;
+	// Gamepad L3 free-look toggle; keeps l3SelectorActive in sync with the game's SelectMode.
+	void UpdateControllerSelectorToggle() const;
 	bool IsCharacterGenuinelyTargeting(uintptr_t characterPtr) const;
 
 	bool FindClientSnapshotForPlayer(bool& outSelectMode, bool& outInputControllerActive, bool& outEnemyTurnActive) const;

@@ -30,7 +30,8 @@ namespace Hooks
 		auto* currentCam = cameraController->GetCurrentCamera();
 		const int16_t playerId = cameraController->GetPlayerIdFromCameraObject(currentCam);
 
-		if (cameraController->IsVanillaFarCameraActive(playerId)) {
+		// Vanilla far view or vanilla combat: no mod zoom/anchor handling
+		if (cameraController->ShouldUseVanillaCamera(playerId)) {
 			AnchorState::Get(playerId).floorClipEasedZoom = -1.f;
 			return;
 		}

@@ -34,7 +34,8 @@ namespace Hooks
 		{
 			const auto cameraController = CameraController::GetSingleton();
 			const auto playerIdForVanillaCheck = cameraController->GetOrAssignPlayerSlot(Utils::GetPlayerID(cameraContext));
-			if (cameraController->IsVanillaFarCameraActive(playerIdForVanillaCheck)) {
+			// Vanilla far view or vanilla combat: let the game handle camera input untouched
+			if (cameraController->ShouldUseVanillaCamera(playerIdForVanillaCheck)) {
 				return handleCameraInput_(unused1, unused2, cameraContext, inputEvent);
 			}
 		}
@@ -162,7 +163,8 @@ namespace Hooks
 
 		const auto cameraController = CameraController::GetSingleton();
 		const auto playerId = cameraController->GetPlayerIdFromCameraObject(cameraObject);
-		if (cameraController->IsVanillaFarCameraActive(playerId)) {
+		// Keep the game's default zoom behaviour in vanilla modes
+		if (cameraController->ShouldUseVanillaCamera(playerId)) {
 			return;
 		}
 

@@ -22,6 +22,8 @@ namespace Settings
 		float ZoomToggleFarValue = 10.0f;
 		float ZoomToggleFarFOV = 55.0f;
 		bool VanillaFarCamera = false;
+		// MCM "Use Vanilla Camera in Combat": disables this mod's combat camera and uses the game's default one
+		bool VanillaCombatCamera = false;
 		float ZoomToggleCloseFOV = 40.0f;
 		float ZoomToggleCloseHorizontalOffset = 0.50f;
 		float ZoomToggleCloseVerticalOffset = 0.74f;

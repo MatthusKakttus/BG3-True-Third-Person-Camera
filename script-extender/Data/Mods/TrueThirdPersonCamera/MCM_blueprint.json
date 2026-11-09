@@ -305,6 +305,13 @@
           "SectionDescription": "Camera used in combat while moving, or while an attack or spell is playing out, yours or an enemy's.",
           "Settings": [
             {
+              "Id": "VanillaCombatCamera",
+              "Name": "Use Vanilla Camera in Combat",
+              "Type": "checkbox",
+              "Default": false,
+              "Tooltip": "When enabled, this mod's combat camera is turned off and the game's default camera is used during combat and turn-based mode. The settings below then have no effect. Exploration is not affected."
+            },
+            {
               "Id": "ZoomToggleSelectorCloseValue",
               "Name": "Combat Zoom",
               "Type": "slider_float",

@@ -203,7 +203,8 @@ void CameraController::ApplyZoomToggleCameraOverrides()
 
 	{
 		const bool rawCombatOrTB = currentCamera_ && (((currentCamera_->cameraModeFlags & RE::CameraModeFlags::kCombat) != 0) || settings->ZoomToggleFTBActive);
-		const bool combatFocusTrackingEnabled = pd.closeViewMode && settings->ZoomToggleImmersiveMode && (rawCombatOrTB || settings->HasUnstableBoundsStatus);
+		// Not reported as enabled in vanilla combat, so the client Lua stops changing the camera targets
+		const bool combatFocusTrackingEnabled = pd.closeViewMode && settings->ZoomToggleImmersiveMode && (rawCombatOrTB || settings->HasUnstableBoundsStatus) && !IsVanillaCombatCameraActive(playerId);
 		if (!pd.combatFocusTrackingStateInitialized || combatFocusTrackingEnabled != pd.prevCombatFocusTrackingEnabled) {
 			pd.combatFocusTrackingStateInitialized = true;
 			pd.prevCombatFocusTrackingEnabled = combatFocusTrackingEnabled;
@@ -211,7 +212,8 @@ void CameraController::ApplyZoomToggleCameraOverrides()
 		}
 	}
 
-	if (IsVanillaFarCameraActive(playerId)) {
+	// Vanilla far view or vanilla combat: put the game's camera values back and skip all mod overrides
+	if (ShouldUseVanillaCamera(playerId)) {
 		RestoreVanillaCameraBaseline();
 		return;
 	}
